@@ -1,0 +1,46 @@
+# Dependencies (match anywhere)
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+
+# Next.js
+.next/
+**/.next/
+out/
+**/out/
+
+# Env files
+.env
+.env.*
+# If you want to commit specific example envs, rename them to .env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches and misc
+.turbo/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# OS / Editor
+.DS_Store
+.vscode/
+
+# Vercel / Deploy
+.vercel/
+**/.vercel/
+
+# Certificates / keys (optional)
+*.pem
