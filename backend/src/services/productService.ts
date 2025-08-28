@@ -1,23 +1,12 @@
-// src/services/productService.ts
-// Ensures Product Type schema (incl. SameForAll), normalizes enum values,
-// and creates a product with localized name/slug/description, master + variants, and optional publish.
-
 import { ctJsonGetOrNull, ctJsonPost } from "../commercetools/client";
 
-/** =========================
- *  Types
- *  ========================= */
 export type EnumSpec = { key: string; label: string };
 
 type AttrBase = {
   name: string;
   required?: boolean;
   searchable?: boolean;
-  /**
-   * If true, attribute is product-level (shown on General tab in MC).
-   * We map this to attributeConstraint: "SameForAll" in CT.
-   */
-  sameForAll?: boolean;
+   sameForAll?: boolean;
 };
 
 export type AttributeSpec =
@@ -27,46 +16,43 @@ export type AttributeSpec =
   | (AttrBase & { type: "enum"; values: EnumSpec[] });
 
 export type ProductTypeConfig = {
-  key: string;                 // e.g., "electronics-type-v3"
-  attributes: AttributeSpec[]; // schema to ensure/update
+  key: string;       
+  attributes: AttributeSpec[]; 
 };
 
 export type VariantInput = {
   sku: string;
   attributes?: Record<string, any>;
-  centAmount?: number;              // optional per-variant price
-  currencyCode?: string;            // optional per-variant currency
+  centAmount?: number;        
+  currencyCode?: string;     
   images?: { url: string; w: number; h: number }[];
 };
 
 export type CreateProductInput = {
-  // Required core
+
   name: string;
   currencyCode: string;
   centAmount: number;
   sku: string;
 
-  // Localized content
-  locale?: string;                    // default "en-US"
-  slug?: string;                      // auto from name if missing
-  description?: string;               // optional description (localized)
 
-  // Identity/flags
-  key?: string;                       // product key (if you manage uniqueness)
-  publish?: boolean;                  // default true
+  locale?: string;                
+  slug?: string;                  
+  description?: string;         
 
-  // Product Type selection
-  productTypeKey?: string;            // used if productTypeConfig is not provided
+  key?: string;                   
+  publish?: boolean;               
+
+
+  productTypeKey?: string;       
   productTypeConfig?: ProductTypeConfig;
 
-  // Attributes & variants
-  attributes?: Record<string, any>;   // master variant attributes
-  variants?: VariantInput[];          // additional variants
+
+  attributes?: Record<string, any>;   
+  variants?: VariantInput[];         
 };
 
-/** =========================
- *  Utils
- *  ========================= */
+
 function toSlug(input: string) {
   return input
     .toLowerCase()
@@ -85,13 +71,6 @@ function attrObjToArray(obj?: Record<string, any>) {
   return Object.entries(obj).map(([name, value]) => ({ name, value }));
 }
 
-/**
- * Normalize attribute values to match ProductType definitions:
- * - For enum attributes, accept:
- *    • string "acme" or "Acme" (matches by key/label, case-insensitive)
- *    • object { key } / { key, label } (key must match)
- * - Throws with a clear message if value isn't one of the allowed enum keys.
- */
 function normalizeAttributesForDraft(
   attrs: Record<string, any> | undefined,
   typeSpec?: ProductTypeConfig
@@ -108,7 +87,7 @@ function normalizeAttributesForDraft(
     const spec = specByName.get(name);
 
     if (!spec || spec.type !== "enum") {
-      out[name] = rawValue; // pass-through for non-enum
+      out[name] = rawValue; 
       continue;
     }
 
@@ -136,26 +115,22 @@ function normalizeAttributesForDraft(
       continue;
     }
 
-    // Fallback (let CT validate)
     out[name] = rawValue;
   }
 
   return out;
 }
 
-/** =========================
- *  Product Type Ensure / Update (idempotent)
- *  ========================= */
+
 function attrDefFromSpec(a: AttributeSpec) {
-  // MC shows attributes on "General" only when attributeConstraint is "SameForAll".
   const attributeConstraint = a.sameForAll ? "SameForAll" : "None";
 
   const base = {
     name: a.name,
     label: { en: a.name[0]?.toUpperCase() + a.name.slice(1) },
     isRequired: !!a.required,
-    isSearchable: a.searchable !== false, // default true
-    attributeConstraint,                   // ← product-level if "SameForAll"
+    isSearchable: a.searchable !== false, 
+    attributeConstraint,               
     inputHint: "SingleLine" as const,
   };
 
@@ -168,13 +143,6 @@ function attrDefFromSpec(a: AttributeSpec) {
   }
 }
 
-/**
- * Ensure a Product Type with the given key exists and contains at least the attributes specified.
- * - Creates Product Type if missing.
- * - Adds missing attributes.
- * - For enum attributes, adds missing enum values.
- * Note: you cannot change attributeConstraint of an existing attribute; use a new type key.
- */
 export async function ensureProductTypeWithAttributes(
   key: string,
   attrs: AttributeSpec[]
@@ -209,7 +177,7 @@ export async function ensureProductTypeWithAttributes(
       continue;
     }
 
-    // If enum: add newly requested enum values
+
     if (spec.type === "enum" && already.type?.name === "enum") {
       const have = new Set((already.type.values ?? []).map((v: any) => v.key));
       for (const v of spec.values) {
@@ -217,7 +185,7 @@ export async function ensureProductTypeWithAttributes(
           actions.push({
             action: "addPlainEnumValue",
             attributeName: spec.name,
-            value: v, // { key, label }
+            value: v,
           });
         }
       }
@@ -234,9 +202,6 @@ export async function ensureProductTypeWithAttributes(
   return pt;
 }
 
-/** =========================
- *  Product Create (master + variants) with SameForAll injection
- *  ========================= */
 export async function createProduct(input: CreateProductInput) {
   const {
     name,
@@ -254,7 +219,7 @@ export async function createProduct(input: CreateProductInput) {
     variants = [],
   } = input;
 
-  // Determine Product Type key + attributes (ensure/update)
+ 
   const typeKey = productTypeConfig?.key ?? productTypeKey;
   const typeAttrs: AttributeSpec[] =
     productTypeConfig?.attributes ??
@@ -265,18 +230,14 @@ export async function createProduct(input: CreateProductInput) {
 
   const productType = await ensureProductTypeWithAttributes(typeKey, typeAttrs);
 
-  // Normalize master attributes
   const normalizedMasterAttrs =
     normalizeAttributesForDraft(attributes, productTypeConfig) ?? {};
 
-  // Collect SameForAll attribute names from the provided type spec
   const sameForAllSet = new Set(
     (productTypeConfig?.attributes ?? [])
       .filter(a => a.sameForAll)
       .map(a => a.name)
   );
-
-  // Ensure master provides values for SameForAll attributes
   for (const name of sameForAllSet) {
     if (normalizedMasterAttrs[name] === undefined) {
       throw new Error(
@@ -285,16 +246,16 @@ export async function createProduct(input: CreateProductInput) {
     }
   }
 
-  // Normalize variants and inject SameForAll values
+
   const normalizedVariants = variants.map(v => {
     const vAttrs = normalizeAttributesForDraft(v.attributes, productTypeConfig) ?? {};
 
     for (const name of sameForAllSet) {
       const masterVal = normalizedMasterAttrs[name];
       if (vAttrs[name] === undefined) {
-        vAttrs[name] = masterVal; // inject
+        vAttrs[name] = masterVal;
       } else {
-        // Validate equality (deep enough for our enum/text values)
+   
         const a = JSON.stringify(vAttrs[name]);
         const b = JSON.stringify(masterVal);
         if (a !== b) {
@@ -309,7 +270,7 @@ export async function createProduct(input: CreateProductInput) {
     return { ...v, attributes: vAttrs };
   });
 
-  // Build product draft
+
   const draft: any = {
     key,
     productType: { id: productType.id },
@@ -343,14 +304,10 @@ export async function createProduct(input: CreateProductInput) {
     draft.description = localized(description, locale);
   }
 
-  // Create the product
   const created = await ctJsonPost(`/products`, draft);
   return created;
 }
 
-/** =========================
- *  Publish / Unpublish helpers
- *  ========================= */
 export async function publishProduct(productId: string, version: number) {
   return await ctJsonPost(`/products/${productId}`, {
     version,

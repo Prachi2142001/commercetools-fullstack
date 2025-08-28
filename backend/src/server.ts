@@ -1,22 +1,28 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 dotenv.config();
 
-import productsRoutes from "./routes/productRoutes";   // your existing admin (create/publish)
-import storefrontProducts from "./routes/getProducts"; // NEW: listing + detail (GET)
+import express from "express";
+import cors from "cors";
+import productsRoutes from "./routes/productRoutes";  
+import storefrontProducts from "./routes/getProducts";
+import cartRoutes from "./routes/cartRoutes";   
+import cookieParser from "cookie-parser";
+
 
 const app = express();
-app.use(cors());
+
+app.use(cookieParser());
+app.use(cors({ origin: "http://localhost:3000", credentials: true })); 
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-// Admin routes (create/publish etc.)
-app.use("/api/products", productsRoutes);
 
-// Storefront read routes (listing + detail)
+app.use("/api/products", productsRoutes);
 app.use("/api/storefront/products", storefrontProducts);
+
+
+app.use("/api/storefront", cartRoutes); 
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

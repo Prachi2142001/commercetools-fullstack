@@ -7,29 +7,28 @@ import type { ProductDetail } from "@/types/product-types";
 import QuantityStepper from "@/components/QuantityStepper";
 import AddToCartButton from "@/components/AddToCartButton";
 
-export default function ProductDetailPage({
-  product,
-}: {
-  product: ProductDetail;
-}) {
+export default function ProductDetailPage({ product }: { product: ProductDetail }) {
   const products = product;
   const masterVariant = products.masterVariant;
   const [qty, setQty] = useState(1);
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] py-10 px-2">
-      <div className="w-full max-w-xl p-8 rounded-2xl shadow-2xl  bg-white/80 space-y-6">
+      <div className="w-full max-w-xl p-8 rounded-2xl shadow-2xl bg-white/80 space-y-6">
         <div className="mb-2 text-sm text-gray-500">
           <Link href="/" className="hover:underline">
             Back to Products
           </Link>
         </div>
+
         <h3 className="text-xl font-extrabold text-indigo-900 tracking-tight">
           {products.name}
         </h3>
+
         {products.description && (
           <p className="mt-2 text-lg text-pink-700">{products.description}</p>
         )}
+
         <div className="mt-2 text-xl font-bold text-pink-600">
           {formatPrice(
             {

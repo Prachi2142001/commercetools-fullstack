@@ -1,0 +1,80 @@
+import { Router, Request, Response, NextFunction } from "express";
+import {
+  getCart,
+  getCartOrNull,
+  createCart,
+  addLineItem,
+  applyDiscountCode,
+  removeDiscountCode,
+} from "../services/cartService";
+
+const router = Router();
+
+type ReqWithCart = Request & { cartId?: string };
+
+
+router.use(async (req: ReqWithCart, res: Response, next: NextFunction) => {
+  try {
+    const cookieId = (req as any).cookies?.cartId as string | undefined;
+
+    if (cookieId) {
+      const existing = await getCartOrNull(cookieId);
+      if (existing) {
+        req.cartId = existing.id;
+        return next();
+      }
+
+    }
+
+    const created = await createCart("USD");
+    res.cookie("cartId", created.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 24 * 7, 
+    });
+    req.cartId = created.id;
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+router.get("/cart", async (req: ReqWithCart, res: Response) => {
+  const cart = await getCart(req.cartId!);
+  res.json(cart);
+});
+
+
+router.post("/cart/line-items", async (req: ReqWithCart, res: Response) => {
+  const { productId, variantId, quantity = 1 } = req.body || {};
+  if (!productId || !variantId) {
+    return res.status(400).send("productId and variantId are required");
+  }
+
+  const cart = await getCart(req.cartId!);
+  const updated = await addLineItem(cart, productId, Number(variantId), Number(quantity));
+  res.json(updated);
+});
+
+router.post("/cart/discount-codes", async (req: ReqWithCart, res: Response) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).send("code is required");
+
+  try {
+    const cart = await getCart(req.cartId!);
+    const updated = await applyDiscountCode(cart, String(code));
+    res.json(updated);
+  } catch (e: any) {
+    res.status(400).send(e?.message || "Failed to apply discount code");
+  }
+});
+
+router.delete("/cart/discount-codes/:codeId", async (req: ReqWithCart, res: Response) => {
+  const { codeId } = req.params;
+  const cart = await getCart(req.cartId!);
+  const updated = await removeDiscountCode(cart, String(codeId));
+  res.json(updated);
+});
+
+export default router;
