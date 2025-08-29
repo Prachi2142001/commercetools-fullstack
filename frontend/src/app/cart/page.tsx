@@ -7,6 +7,10 @@ import {
   removePromo,
   updateLineItemQuantity,
   removeLineItem,
+  setCartAddress,
+  getShippingMethods,
+  chooseShippingMethod,
+  getCartTotals,
 } from "@/lib/cart-client";
 import { formatPrice } from "@/lib/price-format";
 import type { Cart, Money } from "@/types/cart-types";
@@ -27,25 +31,55 @@ function money(m?: Money) {
 type Notice = { type: "success" | "error"; text: string } | null;
 
 export default function CartPage() {
+
   const [cart, setCart] = useState<Cart | null>(null);
   const [code, setCode] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [itemLoadingId, setItemLoadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<Notice>(null);
 
+
+  const [addr, setAddr] = useState({
+    firstName: "Prachi",
+    lastName: "Birla",
+    streetName: "Market Street 24",
+    postalCode: "94103",
+    city: "San Francisco",
+    country: "US",
+  });
+  const [methods, setMethods] = useState<
+    { id: string; name: string; description?: any; price?: Money | null; matchesCart?: boolean }[]
+  >([]);
+  const [chosenMethodId, setChosenMethodId] = useState<string>("");
+  const [totals, setTotals] = useState<{
+    currency?: string;
+    subtotal?: Money | null;
+    shipping?: Money | null;
+    tax?: Money | null;
+    total?: Money | null;
+  } | null>(null);
+  const [shipLoading, setShipLoading] = useState(false);
+
   async function refresh() {
     const c = await getCart();
     setCart(c);
+    try {
+      const t = await getCartTotals();
+      setTotals(t);
+    } catch {
+    }
   }
 
   useEffect(() => {
     refresh();
   }, []);
+
   useEffect(() => {
     if (!msg) return;
     const t = setTimeout(() => setMsg(null), 3000);
     return () => clearTimeout(t);
   }, [msg]);
+
   const currency = cart?.totalPrice?.currencyCode || "USD";
   const subtotalCents = useMemo(
     () =>
@@ -114,6 +148,39 @@ export default function CartPage() {
       setMsg({ type: "error", text: e?.message || "Failed to remove item." });
     } finally {
       setItemLoadingId(null);
+    }
+  }
+  async function onSaveAddress() {
+    try {
+      setShipLoading(true);
+      await setCartAddress(addr);
+      const m = await getShippingMethods();
+      setMethods(m);
+      if (m?.length) setChosenMethodId(m[0].id); // pre-select first
+      setTotals(await getCartTotals());
+      setMsg({ type: "success", text: "Address saved." });
+    } catch (e: any) {
+      setMsg({ type: "error", text: e?.message || "Failed to save address." });
+    } finally {
+      setShipLoading(false);
+    }
+  }
+  async function onChooseMethod() {
+    if (!chosenMethodId) return;
+    try {
+      setShipLoading(true);
+      await chooseShippingMethod(chosenMethodId);
+      setTotals(await getCartTotals());
+      setMsg({ type: "success", text: "Shipping method set." });
+    } catch (e: any) {
+      setMsg({
+        type: "error",
+        text:
+          e?.message ||
+          "Failed to set shipping method. Make sure you pick one that matches the cart.",
+      });
+    } finally {
+      setShipLoading(false);
     }
   }
 
@@ -187,6 +254,7 @@ export default function CartPage() {
             );
           })}
         </div>
+
         <div className="border rounded-xl p-4 sm:p-6 bg-white/80 space-y-3 shadow-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>
@@ -205,6 +273,7 @@ export default function CartPage() {
             <span className="text-indigo-900">{money(cart.totalPrice)}</span>
           </div>
         </div>
+
         <div className="flex flex-wrap gap-3 items-center justify-start">
           <input
             value={code}
@@ -242,6 +311,78 @@ export default function CartPage() {
             );
           })}
         </div>
+        <div className="border rounded-2xl p-4 sm:p-6 bg-white/90 shadow space-y-4">
+          <h2 className="text-lg font-bold text-indigo-800">Shipping & Taxes</h2>
+
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input className="border rounded px-3 py-2" placeholder="First name"
+              value={addr.firstName} onChange={e => setAddr(a => ({ ...a, firstName: e.target.value }))} />
+            <input className="border rounded px-3 py-2" placeholder="Last name"
+              value={addr.lastName} onChange={e => setAddr(a => ({ ...a, lastName: e.target.value }))} />
+            <input className="border rounded px-3 py-2 sm:col-span-2" placeholder="Street"
+              value={addr.streetName} onChange={e => setAddr(a => ({ ...a, streetName: e.target.value }))} />
+            <input className="border rounded px-3 py-2" placeholder="Postal code"
+              value={addr.postalCode} onChange={e => setAddr(a => ({ ...a, postalCode: e.target.value }))} />
+            <input className="border rounded px-3 py-2" placeholder="City"
+              value={addr.city} onChange={e => setAddr(a => ({ ...a, city: e.target.value }))} />
+            <input className="border rounded px-3 py-2" placeholder="Country (US)"
+              value={addr.country} onChange={e => setAddr(a => ({ ...a, country: e.target.value.toUpperCase() }))} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onSaveAddress}
+              disabled={shipLoading}
+              className="bg-gray-900 text-white px-4 py-2 rounded-md shadow hover:opacity-90 disabled:opacity-60"
+            >
+              {shipLoading ? "Saving…" : "Save address"}
+            </button>
+
+            {methods.length > 0 && (
+              <>
+                <select
+                  className="border rounded px-3 py-2"
+                  value={chosenMethodId}
+                  onChange={(e) => setChosenMethodId(e.target.value)}
+                >
+                  {methods.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}{m.matchesCart === false ? " (not eligible)" : ""} — {m.price ? money(m.price as any) : "—"}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={onChooseMethod}
+                  disabled={!chosenMethodId || shipLoading}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {shipLoading ? "Setting…" : "Set shipping method"}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="mt-2 border rounded-xl p-4 bg-white/80 space-y-2">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{money(totals?.subtotal || undefined)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span>{money(totals?.shipping || undefined)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Taxes</span>
+              <span>{money(totals?.tax || undefined)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Order Total</span>
+              <span className="text-indigo-900">{money(totals?.total || cart.totalPrice)}</span>
+            </div>
+          </div>
+        </div>
+
         {msg && (
           <div
             className={`text-sm px-3 py-2 mt-2 rounded-md absolute top-4 right-4 z-10 shadow-md transition-all ${

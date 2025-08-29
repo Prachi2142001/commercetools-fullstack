@@ -15,6 +15,7 @@ app.use(cookieParser());
 app.use(cors({ origin: "http://localhost:3000", credentials: true })); 
 app.use(express.json());
 
+
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 
@@ -23,6 +24,15 @@ app.use("/api/storefront/products", storefrontProducts);
 
 
 app.use("/api/storefront", cartRoutes); 
+
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+    exposedHeaders: ["x-cart-id"], 
+  })
+);
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
