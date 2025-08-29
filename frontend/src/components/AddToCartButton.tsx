@@ -25,8 +25,6 @@ export default function AddToCartButton({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const btnRef = useRef<HTMLButtonElement | null>(null);
-
-  // Native listener to detect overlays / hydration issues
   useEffect(() => {
     const el = btnRef.current;
     if (!el) return;
@@ -54,7 +52,6 @@ export default function AddToCartButton({
       console.log("[ATC] addLineItem OK", { cartId: res?.id });
 
       if (redirectToCart) {
-        // fallback: use hard navigation if router push were ever skipped
         try {
           router.push("/cart");
         } catch {
@@ -77,7 +74,6 @@ export default function AddToCartButton({
         type="button"
         onClick={onClick}
         disabled={loading}
-        // Make sure nothing blocks the pointer:
         className="relative z-[9999] pointer-events-auto bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-60 cursor-pointer"
         style={{ pointerEvents: "auto" }}
       >

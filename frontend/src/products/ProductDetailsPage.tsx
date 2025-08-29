@@ -46,24 +46,9 @@ export default function ProductDetailPage({
 
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <QuantityStepper value={qty} onChange={setQty} />
-          {/* <AddToCartButton
-            productId={products.id}
-            name={products.name}
-            priceText={formatPrice(
-              {
-                centAmount: masterVariant?.price?.price?.centAmount,
-                currency: masterVariant?.price?.price?.currencyCode ?? "USD",
-                fractionDigits:
-                  masterVariant?.price?.price?.fractionDigits ?? 2,
-              },
-              "en-US"
-            )}
-            quantity={qty}
-            variantId={masterVariant?.id ?? 1}
-          /> */}
           <AddToCartButton
             productId={products.id}
-            variantId={masterVariant?.id ?? 1} 
+            variantId={masterVariant?.id ?? 1}
             quantity={qty}
           />
         </div>

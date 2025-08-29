@@ -13,7 +13,7 @@ type Props = {
 export default function QuantityStepper({
   value,
   onChange,
-  min = 1, // min for cart should be 1
+  min = 1, 
   max,
   disabled = false,
   className = "",

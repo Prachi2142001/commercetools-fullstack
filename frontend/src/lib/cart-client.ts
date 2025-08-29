@@ -22,7 +22,6 @@ export function addLineItem(opts: { productId: string; variantId: number; quanti
   );
 }
 
-// PATCH endpoint expects /cart/line-items/:lineItemId
 export function updateLineItemQuantity(opts: { lineItemId: string; quantity: number }) {
   return asJson(
     fetch(`${SF}/cart/line-items/${opts.lineItemId}`, {
@@ -34,7 +33,6 @@ export function updateLineItemQuantity(opts: { lineItemId: string; quantity: num
   );
 }
 
-// DELETE endpoint expects /cart/line-items/:lineItemId and no body
 export function removeLineItem(lineItemId: string) {
   return asJson(
     fetch(`${SF}/cart/line-items/${lineItemId}`, {

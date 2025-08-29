@@ -29,9 +29,7 @@ type Notice = { type: "success" | "error"; text: string } | null;
 export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [code, setCode] = useState("");
-  // Separate loading state for promo code usage
   const [promoLoading, setPromoLoading] = useState(false);
-  // Item action state for which line item is being updated/removed
   const [itemLoadingId, setItemLoadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<Notice>(null);
 
@@ -60,7 +58,6 @@ export default function CartPage() {
   const totalCents = cart?.totalPrice?.centAmount ?? subtotalCents;
   const discountApplied = totalCents < subtotalCents;
 
-  // PROMO CODE
   async function onApply() {
     if (!code.trim()) return;
     try {
@@ -89,7 +86,6 @@ export default function CartPage() {
     }
   }
 
-  // LINE ITEM QUANTITY change
   async function onChangeQty(lineItemId: string, quantity: number) {
     try {
       setItemLoadingId(lineItemId);
@@ -109,7 +105,6 @@ export default function CartPage() {
     }
   }
 
-  // LINE ITEM REMOVE
   async function onRemoveLine(lineItemId: string) {
     try {
       setItemLoadingId(lineItemId);
@@ -132,11 +127,9 @@ export default function CartPage() {
   return (
     <main className="flex items-center justify-center min-h-[65vh] py-8 px-2">
       <div className="w-full max-w-3xl p-4 sm:p-8 rounded-2xl shadow-2xl bg-white/90 space-y-8 relative z-0">
-        {/* Title */}
         <h1 className="text-2xl sm:text-3xl font-extrabold text-indigo-900 tracking-tight mb-2">
           Your Cart
         </h1>
-        {/* Cart Items */}
         <div className="space-y-4">
           {cart.lineItems?.map((li) => {
             const qty = li.quantity ?? 1;
@@ -194,7 +187,6 @@ export default function CartPage() {
             );
           })}
         </div>
-        {/* Cart Summary */}
         <div className="border rounded-xl p-4 sm:p-6 bg-white/80 space-y-3 shadow-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>
@@ -213,7 +205,6 @@ export default function CartPage() {
             <span className="text-indigo-900">{money(cart.totalPrice)}</span>
           </div>
         </div>
-        {/* Promo Code Section */}
         <div className="flex flex-wrap gap-3 items-center justify-start">
           <input
             value={code}
@@ -231,15 +222,9 @@ export default function CartPage() {
           </button>
 
           {(cart.discountCodes ?? []).map((codes) => {
-            // For debugging, see the full structure in the console
-            console.log("Codeeeeeeeeeee,", codes);
-
             const dc: any = codes.discountCode as any;
             const dcId: string = dc?.id;
-            // Get the human-readable promo code, fallback to generic if not available
-            const label: string =
-              dc?.obj?.code ?? // <--- THIS IS NOW AVAILABLE! Shows "Welcome10" etc.
-              "Promo applied";
+            const label: string = dc?.obj?.code ?? "Promo applied";
 
             return (
               <div key={dcId} className="flex items-center gap-2">
@@ -257,7 +242,6 @@ export default function CartPage() {
             );
           })}
         </div>
-        {/* Notice */}
         {msg && (
           <div
             className={`text-sm px-3 py-2 mt-2 rounded-md absolute top-4 right-4 z-10 shadow-md transition-all ${

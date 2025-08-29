@@ -13,7 +13,6 @@ const router = Router();
 
 type ReqWithCart = Request & { cartId?: string };
 
-// Middleware to get or create cart and set cartId cookie
 router.use(async (req: ReqWithCart, res: Response, next: NextFunction) => {
   try {
     const cookieId = (req as any).cookies?.cartId as string | undefined;
@@ -37,13 +36,13 @@ router.use(async (req: ReqWithCart, res: Response, next: NextFunction) => {
   }
 });
 
-// GET cart
+
 router.get("/cart", async (req: ReqWithCart, res: Response) => {
   const cart = await getCart(req.cartId!);
   res.json(cart);
 });
 
-// POST add line item
+
 router.post("/cart/line-items", async (req: ReqWithCart, res: Response) => {
   const { productId, variantId, quantity = 1 } = req.body || {};
   if (!productId || !variantId) {
@@ -55,7 +54,6 @@ router.post("/cart/line-items", async (req: ReqWithCart, res: Response) => {
   res.json(updated);
 });
 
-// PATCH update line item quantity
 router.patch("/cart/line-items/:lineItemId", async (req: ReqWithCart, res: Response) => {
   const { lineItemId } = req.params;
   const { quantity } = req.body;
@@ -69,7 +67,6 @@ router.patch("/cart/line-items/:lineItemId", async (req: ReqWithCart, res: Respo
   res.json(updated);
 });
 
-// DELETE remove line item
 router.delete("/cart/line-items/:lineItemId", async (req: ReqWithCart, res: Response) => {
   const { lineItemId } = req.params;
   if (!lineItemId) return res.status(400).send("lineItemId required");
@@ -78,7 +75,6 @@ router.delete("/cart/line-items/:lineItemId", async (req: ReqWithCart, res: Resp
   res.json(updated);
 });
 
-// POST apply discount code
 router.post("/cart/discount-codes", async (req: ReqWithCart, res: Response) => {
   const { code } = req.body || {};
   if (!code) return res.status(400).send("code is required");
@@ -92,7 +88,6 @@ router.post("/cart/discount-codes", async (req: ReqWithCart, res: Response) => {
   }
 });
 
-// DELETE remove discount code
 router.delete("/cart/discount-codes/:codeId", async (req: ReqWithCart, res: Response) => {
   const { codeId } = req.params;
   const cart = await getCart(req.cartId!);
