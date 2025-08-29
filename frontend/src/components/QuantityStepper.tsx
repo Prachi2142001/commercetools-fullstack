@@ -7,13 +7,15 @@ type Props = {
   min?: number;
   max?: number;
   className?: string;
+  disabled?: boolean;
 };
 
 export default function QuantityStepper({
   value,
   onChange,
-  min = 1,
+  min = 1, // min for cart should be 1
   max,
+  disabled = false,
   className = "",
 }: Props) {
   const [draft, setDraft] = useState<string>(String(value));
@@ -22,7 +24,7 @@ export default function QuantityStepper({
   const commit = useCallback(
     (raw: string) => {
       const digits = raw.replace(/[^\d]/g, "");
-      if (digits === "") return setDraft(String(value)); 
+      if (digits === "") return setDraft(String(value));
       let next = parseInt(digits, 10);
       if (typeof max === "number") next = Math.min(next, max);
       next = Math.max(min, next);
@@ -33,7 +35,7 @@ export default function QuantityStepper({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (/^\d*$/.test(raw)) setDraft(raw); 
+    if (/^\d*$/.test(raw)) setDraft(raw);
   };
   const handleBlur = () => commit(draft);
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -44,16 +46,26 @@ export default function QuantityStepper({
   };
 
   const dec = () => onChange(Math.max(min, value - 1));
-  const inc = () => onChange(typeof max === "number" ? Math.min(max, value + 1) : value + 1);
+  const inc = () =>
+    onChange(typeof max === "number" ? Math.min(max, value + 1) : value + 1);
 
   return (
-    <div className={`flex items-center rounded-lg border-2 border-indigo-300 bg-gradient-to-r from-pink-100 via-indigo-50 to-yellow-100 shadow-md ${className}`}>
-      <button type="button" onClick={dec} className="px-3 py-2 text-lg font-bold text-indigo-700 hover:text-pink-600">–</button>
+    <div
+      className={`flex items-center rounded-lg border-2 border-indigo-300 bg-gradient-to-r from-pink-100 via-indigo-50 to-yellow-100 shadow-md ${className}`}
+    >
+      <button
+        type="button"
+        onClick={dec}
+        className="px-3 py-2 text-lg font-bold text-indigo-700 hover:text-pink-600"
+        disabled={disabled}
+      >
+        –
+      </button>
       <input
         type="text"
         inputMode="numeric"
         pattern="\d*"
-        value={draft}               
+        value={draft}
         onChange={handleChange}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
@@ -61,7 +73,14 @@ export default function QuantityStepper({
         aria-label="Quantity"
       />
 
-      <button type="button" onClick={inc} className="px-3 py-2 text-lg font-bold text-indigo-700 hover:text-pink-600">+</button>
+      <button
+        type="button"
+        onClick={inc}
+        disabled={disabled}
+        className="px-3 py-2 text-lg font-bold text-indigo-700 hover:text-pink-600"
+      >
+        +
+      </button>
     </div>
   );
 }

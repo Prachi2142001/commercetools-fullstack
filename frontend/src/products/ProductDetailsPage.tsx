@@ -7,14 +7,18 @@ import type { ProductDetail } from "@/types/product-types";
 import QuantityStepper from "@/components/QuantityStepper";
 import AddToCartButton from "@/components/AddToCartButton";
 
-export default function ProductDetailPage({ product }: { product: ProductDetail }) {
+export default function ProductDetailPage({
+  product,
+}: {
+  product: ProductDetail;
+}) {
   const products = product;
   const masterVariant = products.masterVariant;
   const [qty, setQty] = useState(1);
 
   return (
     <div className="flex items-center justify-center min-h-[70vh] py-10 px-2">
-      <div className="w-full max-w-xl p-8 rounded-2xl shadow-2xl bg-white/80 space-y-6">
+      <div className="w-full max-w-xl p-8 rounded-2xl shadow-2xl bg-white/80 space-y-6 relative z-0 pointer-events-auto">
         <div className="mb-2 text-sm text-gray-500">
           <Link href="/" className="hover:underline">
             Back to Products
@@ -42,17 +46,24 @@ export default function ProductDetailPage({ product }: { product: ProductDetail 
 
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <QuantityStepper value={qty} onChange={setQty} />
-          <AddToCartButton
+          {/* <AddToCartButton
             productId={products.id}
             name={products.name}
             priceText={formatPrice(
               {
                 centAmount: masterVariant?.price?.price?.centAmount,
                 currency: masterVariant?.price?.price?.currencyCode ?? "USD",
-                fractionDigits: masterVariant?.price?.price?.fractionDigits ?? 2,
+                fractionDigits:
+                  masterVariant?.price?.price?.fractionDigits ?? 2,
               },
               "en-US"
             )}
+            quantity={qty}
+            variantId={masterVariant?.id ?? 1}
+          /> */}
+          <AddToCartButton
+            productId={products.id}
+            variantId={masterVariant?.id ?? 1} 
             quantity={qty}
           />
         </div>

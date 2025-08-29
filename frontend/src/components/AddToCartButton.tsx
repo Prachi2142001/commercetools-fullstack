@@ -1,55 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { addLineItem } from "@/lib/cart-client";
+import { useRouter } from "next/navigation";
 
 type Props = {
   productId: string;
-  name: string;
-  priceText: string; 
-  quantity: number;
+  variantId?: number;
+  quantity?: number;
+  redirectToCart?: boolean;
   className?: string;
+  name?: string;      // unused but kept for compatibility
+  priceText?: string; // unused but kept for compatibility
 };
 
 export default function AddToCartButton({
   productId,
-  name,
-  priceText,
-  quantity,
+  variantId = 1,
+  quantity = 1,
+  redirectToCart = true,
   className = "",
 }: Props) {
-  const [adding, setAdding] = useState(false);
-  const [justAdded, setJustAdded] = useState(false);
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const btnRef = useRef<HTMLButtonElement | null>(null);
 
-  const onAdd = () => {
-    if (adding) return;
-    setAdding(true);
+  // Native listener to detect overlays / hydration issues
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
 
-    const key = "demo-cart";
-    const existing = JSON.parse(localStorage.getItem(key) || "[]");
-    const idx = existing.findIndex((x: any) => x.id === productId);
-    if (idx >= 0) existing[idx].qty += quantity;
-    else existing.push({ id: productId, name, price: priceText, qty: quantity });
-    localStorage.setItem(key, JSON.stringify(existing));
+    const nativeClick = () => console.log("[ATC:native] click");
+    const nativeDown  = () => console.log("[ATC:native] mousedown");
 
-    setAdding(false);
-    setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 1200);
-  };
+    el.addEventListener("click", nativeClick);
+    el.addEventListener("mousedown", nativeDown);
+    console.log("[ATC] mounted", { productId, variantId, quantity });
+
+    return () => {
+      el.removeEventListener("click", nativeClick);
+      el.removeEventListener("mousedown", nativeDown);
+    };
+  }, [productId, variantId, quantity]);
+
+  async function onClick() {
+    console.log("[ATC:react] click", { productId, variantId, quantity });
+    try {
+      setErr("");
+      setLoading(true);
+
+      const res = await addLineItem({ productId, variantId, quantity });
+      console.log("[ATC] addLineItem OK", { cartId: res?.id });
+
+      if (redirectToCart) {
+        // fallback: use hard navigation if router push were ever skipped
+        try {
+          router.push("/cart");
+        } catch {
+          window.location.href = "/cart";
+        }
+      }
+    } catch (e: any) {
+      console.error("[ATC] addLineItem FAIL", e);
+      setErr(e?.message || "Failed to add to cart");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <button
-      type="button"
-      onClick={onAdd}
-      disabled={adding}
-      className={`rounded-xl px-5 py-2.5 font-semibold text-white shadow-lg transition ${
-        justAdded
-          ? "bg-green-500 hover:bg-green-600"
-          : "bg-pink-600 hover:bg-indigo-700"
-      } disabled:opacity-60 ${className}`}
-      aria-live="polite"
-    >
-      {justAdded ? "Added!" : adding ? "Adding…" : "Add to Cart"}
-    </button>
+    <div className={`flex items-center gap-3 ${className}`}>
+      <button
+        ref={btnRef}
+        id="atc-btn"
+        type="button"
+        onClick={onClick}
+        disabled={loading}
+        // Make sure nothing blocks the pointer:
+        className="relative z-[9999] pointer-events-auto bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-60 cursor-pointer"
+        style={{ pointerEvents: "auto" }}
+      >
+        {loading ? "Adding…" : "Add to Cart"}
+      </button>
+      {err && <span className="text-sm text-red-600">{err}</span>}
+    </div>
   );
 }
-
