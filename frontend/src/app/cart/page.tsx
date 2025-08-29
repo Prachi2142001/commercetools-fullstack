@@ -234,7 +234,7 @@ export default function CartPage() {
                     <button
                       onClick={() => onRemoveLine(li.id)}
                       disabled={itemLoadingId === li.id}
-                      className="ml-2 text-pink-600 text-sm underline hover:opacity-70 transition-opacity"
+                      className="cursor-pointer ml-2 text-pink-600 text-sm underline hover:opacity-70 transition-opacity"
                     >
                       Remove
                     </button>

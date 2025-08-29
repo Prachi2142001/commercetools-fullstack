@@ -9,7 +9,7 @@ export default function ProductCard({ product }: { product: ProductListItem }) {
   return (
     <div
       className="
-      relative z-0
+      relative z-0 cursor-pointer
         flex flex-col justify-between
         bg-gradient-to-br from-pink-100 via-indigo-50 to-yellow-100
         rounded-2xl shadow-xl border-2 border-indigo-200
