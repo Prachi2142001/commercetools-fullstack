@@ -3,10 +3,6 @@ import { listProducts, getProductByIdOrSlug } from '../services/fetchProducts';
 
 const router = Router();
 
-/**
- * GET /api/storefront/products
- * Query: limit, offset, locale, currency, country, customerGroupId, channelId, staged
- */
 router.get('/', async (req, res) => {
   try {
     const { limit, offset, locale, currency, country, customerGroupId, channelId, staged } =
@@ -29,10 +25,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET /api/storefront/products/:idOrSlug
- * Query: locale, currency, country, customerGroupId, channelId, staged
- */
 router.get('/:idOrSlug', async (req, res) => {
   try {
     const { idOrSlug } = req.params;

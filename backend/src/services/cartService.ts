@@ -11,7 +11,6 @@ import type {
   TypedMoney,
 } from "@commercetools/platform-sdk";
 
-
 export async function getCart(cartId: string): Promise<Cart> {
   return ctJsonGet<Cart>(
     `/carts/${cartId}?expand=discountCodes[*].discountCode`
@@ -32,7 +31,6 @@ export async function updateCart(
   maxRetries = 2
 ): Promise<Cart> {
   let current = cart;
-
   for (let i = 0; i <= maxRetries; i++) {
     try {
       const updated = await ctJsonPost<Cart>(`/carts/${current.id}`, {
@@ -48,7 +46,6 @@ export async function updateCart(
       throw err;
     }
   }
-
   throw new Error("Failed to update cart after retries");
 }
 
@@ -60,6 +57,7 @@ export async function addLineItem(
 ): Promise<Cart> {
   return updateCart(cart, [
     { action: "addLineItem", productId, variantId, quantity },
+    { action: "recalculate", updateProductData: false },
   ]);
 }
 
@@ -107,6 +105,7 @@ export async function setShippingMethod(cart: Cart, shippingMethodId: string): P
       action: "setShippingMethod",
       shippingMethod: { typeId: "shipping-method", id: shippingMethodId },
     },
+    { action: "recalculate", updateProductData: false },
   ]);
 }
 
@@ -123,16 +122,12 @@ export async function getMatchingShippingMethodsForCart(
   cartId: string
 ): Promise<SimplifiedShippingMethod[]> {
   const cart = await getCart(cartId);
-
   const country = String((cart as any).shippingAddress?.country || "").toUpperCase();
   if (!country) throw new Error("Set shipping address first (country is required).");
-
   const { results } = await ctJsonGet<{ results: ShippingMethod[] }>(
     `/shipping-methods/matching-cart?cartId=${encodeURIComponent(cartId)}`
   );
-
   const currency = cart.totalPrice?.currencyCode || "USD";
-
   return (results || []).map((m) => {
     const zoneRates = m.zoneRates ?? [];
     const shippingRates = zoneRates.flatMap((zr) => zr.shippingRates ?? []);
@@ -140,12 +135,9 @@ export async function getMatchingShippingMethodsForCart(
       .map((sr) => sr.price)
       .filter((p): p is NonNullable<typeof p> => !!p)
       .filter((p) => p.currencyCode === currency);
-
     const price =
       priceCandidates[0] ?? zoneRates[0]?.shippingRates?.[0]?.price ?? null;
-
     const freeAbove = zoneRates[0]?.shippingRates?.[0]?.freeAbove ?? null;
-
     return {
       id: m.id,
       name: m.name,
@@ -162,22 +154,18 @@ export async function getMatchingShippingMethodsForCart(
 
 export function getNormalizedTotals(cart: Cart) {
   const currency = cart.totalPrice?.currencyCode;
-
   const taxedPrice: any = (cart as any).taxedPrice ?? null;
   const subtotalNet = taxedPrice?.totalNet ?? null;
   const totalTax = taxedPrice?.totalTax ?? null;
   const totalGross = taxedPrice?.totalGross ?? null;
-
   const shippingTaxed: any = (cart.shippingInfo as any)?.taxedPrice ?? null;
   const shippingPrice = cart.shippingInfo?.price ?? null;
-
   const fallbackSubtotalCents = Array.isArray(cart.lineItems)
     ? cart.lineItems.reduce(
         (sum, li) => sum + (li.totalPrice?.centAmount ?? 0),
         0
       )
     : cart.totalPrice?.centAmount ?? 0;
-
   return {
     currency,
     subtotal: subtotalNet

@@ -1,4 +1,3 @@
-// src/scripts/createProduct.ts
 import "dotenv/config";
 import { createProduct, type ProductTypeConfig } from "../services/productService";
 
@@ -10,11 +9,9 @@ async function main() {
   const locale = "en-US";
   const suffix = uniqSuffix();
 
-  // Use the existing product type’s brand enum keys: google | apple | samsung
   const electronicsTypeV3: ProductTypeConfig = {
     key: "electronics-type-v3",
     attributes: [
-      // Keep SameForAll in our app logic; CT won't change attributeConstraint if it already exists.
       { name: "brand", type: "enum", sameForAll: true, values: [
         { key: "google",  label: "Google"  },
         { key: "apple",   label: "Apple"   },
@@ -23,7 +20,7 @@ async function main() {
       { name: "model", type: "text", sameForAll: true, searchable: true },
       { name: "warrantyYears", type: "number", sameForAll: true },
 
-      // Variant-level
+
       {
         name: "color",
         type: "enum",
@@ -49,7 +46,7 @@ async function main() {
     ],
   };
 
-  // ---------- Product 1: Smartphone (brand = google) ----------
+
   const smartphone = {
     name: "Smartphone Alpha",
     slug: `smartphone-alpha-${suffix}`,
@@ -61,13 +58,11 @@ async function main() {
     key: `prod-smartphone-alpha-${suffix}`,
     productTypeConfig: electronicsTypeV3,
 
-    // SameForAll attributes must be present on master
     attributes: {
-      brand: "google",       // enum key from allowed set
+      brand: "google",       
       model: "Alpha",
       warrantyYears: 2,
 
-      // master’s own variant attributes:
       color: "black",
       storage: "128gb",
       is5g: true,
@@ -105,7 +100,6 @@ async function main() {
     ],
   };
 
-  // ---------- Product 2: Laptop (brand = apple) ----------
   const laptop = {
     name: "Laptop Nova",
     slug: `laptop-nova-${suffix}`,
@@ -118,7 +112,7 @@ async function main() {
     productTypeConfig: electronicsTypeV3,
 
     attributes: {
-      brand: "apple",        // enum key from allowed set
+      brand: "apple",        
       model: "Nova 14",
       warrantyYears: 1,
       color: "silver",

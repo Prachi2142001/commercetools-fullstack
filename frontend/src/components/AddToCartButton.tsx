@@ -10,8 +10,10 @@ type Props = {
   quantity?: number;
   redirectToCart?: boolean;
   className?: string;
-  name?: string;      // unused but kept for compatibility
-  priceText?: string; // unused but kept for compatibility
+  name?: string;
+  priceText?: string;
+  onSuccess?: () => void;
+  onError?: () => void;
 };
 
 export default function AddToCartButton({
@@ -20,37 +22,37 @@ export default function AddToCartButton({
   quantity = 1,
   redirectToCart = true,
   className = "",
+  onSuccess,
+  onError,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const btnRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     const el = btnRef.current;
     if (!el) return;
-
     const nativeClick = () => console.log("[ATC:native] click");
-    const nativeDown  = () => console.log("[ATC:native] mousedown");
-
+    const nativeDown = () => console.log("[ATC:native] mousedown");
     el.addEventListener("click", nativeClick);
     el.addEventListener("mousedown", nativeDown);
     console.log("[ATC] mounted", { productId, variantId, quantity });
-
     return () => {
       el.removeEventListener("click", nativeClick);
       el.removeEventListener("mousedown", nativeDown);
     };
   }, [productId, variantId, quantity]);
 
-  async function onClick() {
-    console.log("[ATC:react] click", { productId, variantId, quantity });
+  async function onClick(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
     try {
       setErr("");
       setLoading(true);
-
       const res = await addLineItem({ productId, variantId, quantity });
-      console.log("[ATC] addLineItem OK", { cartId: res?.id });
-
+      console.log("[ATC] addLineItem OK", { cartId: (res as any)?.id });
+      onSuccess?.();
       if (redirectToCart) {
         try {
           router.push("/cart");
@@ -61,9 +63,15 @@ export default function AddToCartButton({
     } catch (e: any) {
       console.error("[ATC] addLineItem FAIL", e);
       setErr(e?.message || "Failed to add to cart");
+      onError?.();
     } finally {
       setLoading(false);
     }
+  }
+
+  function onMouseDown(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   return (
@@ -72,9 +80,10 @@ export default function AddToCartButton({
         ref={btnRef}
         id="atc-btn"
         type="button"
+        onMouseDown={onMouseDown}
         onClick={onClick}
         disabled={loading}
-        className="relative z-[9999] pointer-events-auto bg-indigo-600 text-white px-4 py-2 rounded-md disabled:opacity-60 cursor-pointer"
+        className="relative z-[9999] pointer-events-auto bg-indigo-400 text-white px-4 py-2 rounded-md disabled:opacity-60 cursor-pointer"
         style={{ pointerEvents: "auto" }}
       >
         {loading ? "Adding…" : "Add to Cart"}

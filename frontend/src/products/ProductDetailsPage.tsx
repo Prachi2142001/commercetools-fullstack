@@ -50,6 +50,7 @@ export default function ProductDetailPage({
             productId={products.id}
             variantId={masterVariant?.id ?? 1}
             quantity={qty}
+            redirectToCart={true}
           />
         </div>
       </div>
