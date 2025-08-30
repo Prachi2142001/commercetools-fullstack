@@ -109,6 +109,13 @@ export async function setShippingMethod(cart: Cart, shippingMethodId: string): P
   ]);
 }
 
+export async function unsetShippingMethod(cart: Cart): Promise<Cart> {
+  return updateCart(cart, [
+    { action: "setShippingMethod", shippingMethod: null as any },
+    { action: "recalculate", updateProductData: false },
+  ]);
+}
+
 export type SimplifiedShippingMethod = {
   id: string;
   name: string;
@@ -153,43 +160,55 @@ export async function getMatchingShippingMethodsForCart(
 }
 
 export function getNormalizedTotals(cart: Cart) {
-  const currency = cart.totalPrice?.currencyCode;
-  const taxedPrice: any = (cart as any).taxedPrice ?? null;
-  const subtotalNet = taxedPrice?.totalNet ?? null;
-  const totalTax = taxedPrice?.totalTax ?? null;
-  const totalGross = taxedPrice?.totalGross ?? null;
-  const shippingTaxed: any = (cart.shippingInfo as any)?.taxedPrice ?? null;
+  const currency = cart.totalPrice?.currencyCode || "USD";
+  const lineItems = Array.isArray(cart.lineItems) ? cart.lineItems : [];
+  const itemsSubtotalCents = lineItems.reduce(
+    (sum, li) => sum + (li.totalPrice?.centAmount ?? 0),
+    0
+  );
+
+  if (itemsSubtotalCents === 0) {
+    return {
+      currency,
+      subtotal: { centAmount: 0, currencyCode: currency, fractionDigits: 2 },
+      shipping: { centAmount: 0, currencyCode: currency, fractionDigits: 2 },
+      tax: { centAmount: 0, currencyCode: currency, fractionDigits: 2 },
+      total: { centAmount: 0, currencyCode: currency, fractionDigits: 2 },
+    };
+  }
+
   const shippingPrice = cart.shippingInfo?.price ?? null;
-  const fallbackSubtotalCents = Array.isArray(cart.lineItems)
-    ? cart.lineItems.reduce(
-        (sum, li) => sum + (li.totalPrice?.centAmount ?? 0),
-        0
-      )
-    : cart.totalPrice?.centAmount ?? 0;
+  const shippingMoney =
+    pickMoney(shippingPrice) ??
+    { centAmount: 0, currencyCode: currency, fractionDigits: 2 };
+
+  const totalTax =
+    (cart as any).taxedPrice?.totalTax ??
+    { centAmount: 0, currencyCode: currency, fractionDigits: 2 };
+
+  const subtotalMoney = {
+    centAmount: itemsSubtotalCents,
+    currencyCode: currency,
+    fractionDigits: 2,
+  };
+
+  const taxMoney = pickMoney(totalTax) ?? {
+    centAmount: 0,
+    currencyCode: currency,
+    fractionDigits: 2,
+  };
+
+  const totalCents =
+    subtotalMoney.centAmount +
+    (shippingMoney?.centAmount ?? 0) +
+    (taxMoney?.centAmount ?? 0);
+
   return {
     currency,
-    subtotal: subtotalNet
-      ? pickMoney(subtotalNet)
-      : {
-          centAmount: fallbackSubtotalCents,
-          currencyCode: currency || "USD",
-          fractionDigits: 2,
-        },
-    shipping: shippingTaxed?.totalGross
-      ? pickMoney(shippingTaxed.totalGross)
-      : pickMoney(shippingPrice) ?? {
-          centAmount: 0,
-          currencyCode: currency || "USD",
-          fractionDigits: 2,
-        },
-    tax: totalTax
-      ? pickMoney(totalTax)
-      : {
-          centAmount: 0,
-          currencyCode: currency || "USD",
-          fractionDigits: 2,
-        },
-    total: totalGross ? pickMoney(totalGross) : pickMoney(cart.totalPrice),
+    subtotal: subtotalMoney,
+    shipping: shippingMoney,
+    tax: taxMoney,
+    total: { centAmount: totalCents, currencyCode: currency, fractionDigits: 2 },
   };
 }
 

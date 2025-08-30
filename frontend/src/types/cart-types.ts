@@ -19,10 +19,20 @@ export type DiscountCodeInfo = {
   state: "NotActive" | "NotValid" | "DoesNotMatchCart" | "MatchesCart" | string;
 };
 
+export type ShippingInfo = {
+  shippingMethodName: string;
+  price: Money;
+  shippingMethod?: { id: string; typeId: "shipping-method" };
+};
+
 export type Cart = {
   id: string;
   version: number;
   lineItems: LineItem[];
   discountCodes?: DiscountCodeInfo[];
   totalPrice?: Money;
+  discountOnTotalPrice?: {
+    discountedAmount: Money;
+  };
+  shippingInfo?: ShippingInfo;  
 };

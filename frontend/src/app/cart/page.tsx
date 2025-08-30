@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getCart,
   applyPromo,
@@ -16,7 +16,7 @@ import { formatPrice } from "@/lib/price-format";
 import type { Cart, Money } from "@/types/cart-types";
 import QuantityStepper from "@/components/QuantityStepper";
 
-function money(m?: Money) {
+function money(m?: Money | null) {
   if (!m) return "—";
   return formatPrice(
     {
@@ -31,14 +31,11 @@ function money(m?: Money) {
 type Notice = { type: "success" | "error"; text: string } | null;
 
 export default function CartPage() {
-
   const [cart, setCart] = useState<Cart | null>(null);
   const [code, setCode] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [itemLoadingId, setItemLoadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<Notice>(null);
-
-
   const [addr, setAddr] = useState({
     firstName: "Prachi",
     lastName: "Birla",
@@ -48,7 +45,13 @@ export default function CartPage() {
     country: "US",
   });
   const [methods, setMethods] = useState<
-    { id: string; name: string; description?: any; price?: Money | null; matchesCart?: boolean }[]
+    {
+      id: string;
+      name: string;
+      description?: any;
+      price?: Money | null;
+      matchesCart?: boolean;
+    }[]
   >([]);
   const [chosenMethodId, setChosenMethodId] = useState<string>("");
   const [totals, setTotals] = useState<{
@@ -66,8 +69,7 @@ export default function CartPage() {
     try {
       const t = await getCartTotals();
       setTotals(t);
-    } catch {
-    }
+    } catch {}
   }
 
   useEffect(() => {
@@ -79,18 +81,6 @@ export default function CartPage() {
     const t = setTimeout(() => setMsg(null), 3000);
     return () => clearTimeout(t);
   }, [msg]);
-
-  const currency = cart?.totalPrice?.currencyCode || "USD";
-  const subtotalCents = useMemo(
-    () =>
-      cart?.lineItems?.reduce((sum, li) => {
-        const unit = li.price?.value?.centAmount ?? 0;
-        return sum + unit * (li.quantity ?? 1);
-      }, 0) ?? 0,
-    [cart]
-  );
-  const totalCents = cart?.totalPrice?.centAmount ?? subtotalCents;
-  const discountApplied = totalCents < subtotalCents;
 
   async function onApply() {
     if (!code.trim()) return;
@@ -150,13 +140,14 @@ export default function CartPage() {
       setItemLoadingId(null);
     }
   }
+
   async function onSaveAddress() {
     try {
       setShipLoading(true);
       await setCartAddress(addr);
       const m = await getShippingMethods();
       setMethods(m);
-      if (m?.length) setChosenMethodId(m[0].id); // pre-select first
+      if (m?.length) setChosenMethodId(m[0].id);
       setTotals(await getCartTotals());
       setMsg({ type: "success", text: "Address saved." });
     } catch (e: any) {
@@ -165,6 +156,7 @@ export default function CartPage() {
       setShipLoading(false);
     }
   }
+
   async function onChooseMethod() {
     if (!chosenMethodId) return;
     try {
@@ -191,6 +183,55 @@ export default function CartPage() {
       </main>
     );
 
+  const originalSubtotalCents =
+    cart?.lineItems?.reduce((sum, li) => {
+      const lineTotal = li.price?.value?.centAmount ?? 0;
+      return sum + lineTotal * (li.quantity ?? 1);
+    }, 0) ?? 0;
+
+  const originalSubtotal: Money = {
+    centAmount: originalSubtotalCents,
+    currencyCode: cart?.totalPrice?.currencyCode || "USD",
+    fractionDigits: cart?.totalPrice?.fractionDigits ?? 2,
+  };
+
+  const discountCents =
+    (cart as any).discountOnTotalPrice?.discountedAmount?.centAmount ?? 0;
+
+
+  const discountedTotal: Money = discountCents
+    ? {
+        centAmount: originalSubtotalCents - discountCents,
+        currencyCode: originalSubtotal.currencyCode,
+        fractionDigits: originalSubtotal.fractionDigits,
+      }
+    : originalSubtotal;
+
+  const discountApplied = discountCents > 0;
+
+  const shipping: Money = totals?.shipping || {
+    centAmount: 0,
+    currencyCode: originalSubtotal.currencyCode,
+    fractionDigits: originalSubtotal.fractionDigits,
+  };
+
+  const tax: Money = totals?.tax || {
+    centAmount: 0,
+    currencyCode: originalSubtotal.currencyCode,
+    fractionDigits: originalSubtotal.fractionDigits,
+  };
+
+  const orderTotal: Money = {
+    centAmount:
+      discountedTotal.centAmount +
+      (shipping.centAmount ?? 0) +
+      (tax.centAmount ?? 0),
+    currencyCode: originalSubtotal.currencyCode,
+    fractionDigits: originalSubtotal.fractionDigits,
+  };
+
+  const hasShippingMethod = !!cart?.shippingInfo;
+
   return (
     <main className="flex items-center justify-center min-h-[65vh] py-8 px-2">
       <div className="w-full max-w-3xl p-4 sm:p-8 rounded-2xl shadow-2xl bg-white/90 space-y-8 relative z-0">
@@ -206,6 +247,7 @@ export default function CartPage() {
               ? {
                   centAmount: (unit.centAmount ?? 0) * qty,
                   currencyCode: unit.currencyCode,
+                  fractionDigits: unit.fractionDigits ?? 2,
                 }
               : undefined;
             const lineDiscount =
@@ -222,7 +264,6 @@ export default function CartPage() {
                   <div className="font-semibold text-lg text-indigo-800">
                     {li.name?.["en-US"] || li.productKey || li.productId}
                   </div>
-
                   <div className="text-sm text-gray-500">Qty {qty}</div>
                   <div className="mt-2 flex items-center gap-2">
                     <QuantityStepper
@@ -255,22 +296,22 @@ export default function CartPage() {
           })}
         </div>
 
+        {/* Cart Summary: Subtotal and Total */}
         <div className="border rounded-xl p-4 sm:p-6 bg-white/80 space-y-3 shadow-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>
             {discountApplied ? (
               <span className="line-through text-gray-400 font-medium">
-                {money({ centAmount: subtotalCents, currencyCode: currency })}
+                {money(originalSubtotal)}
               </span>
             ) : (
-              <span>
-                {money({ centAmount: subtotalCents, currencyCode: currency })}
-              </span>
+              <span>{money(originalSubtotal)}</span>
             )}
           </div>
+
           <div className="flex justify-between font-extrabold text-lg">
             <span>Total</span>
-            <span className="text-indigo-900">{money(cart.totalPrice)}</span>
+            <span className="text-indigo-900">{money(discountedTotal)}</span>
           </div>
         </div>
 
@@ -289,12 +330,10 @@ export default function CartPage() {
           >
             {promoLoading ? "Applying…" : "Apply"}
           </button>
-
           {(cart.discountCodes ?? []).map((codes) => {
             const dc: any = codes.discountCode as any;
             const dcId: string = dc?.id;
             const label: string = dc?.obj?.code ?? "Promo applied";
-
             return (
               <div key={dcId} className="flex items-center gap-2">
                 <span className="px-2 py-1 bg-gray-100 rounded text-sm text-gray-900 shadow">
@@ -311,23 +350,61 @@ export default function CartPage() {
             );
           })}
         </div>
+
         <div className="border rounded-2xl p-4 sm:p-6 bg-white/90 shadow space-y-4">
-          <h2 className="text-lg font-bold text-indigo-800">Shipping & Taxes</h2>
-
-
+          <h2 className="text-lg font-bold text-indigo-800">
+            Shipping & Taxes
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input className="border rounded px-3 py-2" placeholder="First name"
-              value={addr.firstName} onChange={e => setAddr(a => ({ ...a, firstName: e.target.value }))} />
-            <input className="border rounded px-3 py-2" placeholder="Last name"
-              value={addr.lastName} onChange={e => setAddr(a => ({ ...a, lastName: e.target.value }))} />
-            <input className="border rounded px-3 py-2 sm:col-span-2" placeholder="Street"
-              value={addr.streetName} onChange={e => setAddr(a => ({ ...a, streetName: e.target.value }))} />
-            <input className="border rounded px-3 py-2" placeholder="Postal code"
-              value={addr.postalCode} onChange={e => setAddr(a => ({ ...a, postalCode: e.target.value }))} />
-            <input className="border rounded px-3 py-2" placeholder="City"
-              value={addr.city} onChange={e => setAddr(a => ({ ...a, city: e.target.value }))} />
-            <input className="border rounded px-3 py-2" placeholder="Country (US)"
-              value={addr.country} onChange={e => setAddr(a => ({ ...a, country: e.target.value.toUpperCase() }))} />
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="First name"
+              value={addr.firstName}
+              onChange={(e) =>
+                setAddr((a) => ({ ...a, firstName: e.target.value }))
+              }
+            />
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="Last name"
+              value={addr.lastName}
+              onChange={(e) =>
+                setAddr((a) => ({ ...a, lastName: e.target.value }))
+              }
+            />
+            <input
+              className="border rounded px-3 py-2 sm:col-span-2"
+              placeholder="Street"
+              value={addr.streetName}
+              onChange={(e) =>
+                setAddr((a) => ({ ...a, streetName: e.target.value }))
+              }
+            />
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="Postal code"
+              value={addr.postalCode}
+              onChange={(e) =>
+                setAddr((a) => ({ ...a, postalCode: e.target.value }))
+              }
+            />
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="City"
+              value={addr.city}
+              onChange={(e) => setAddr((a) => ({ ...a, city: e.target.value }))}
+            />
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="Country (US)"
+              value={addr.country}
+              onChange={(e) =>
+                setAddr((a) => ({
+                  ...a,
+                  country: e.target.value.toUpperCase(),
+                }))
+              }
+            />
           </div>
 
           <div className="flex items-center gap-3">
@@ -338,7 +415,6 @@ export default function CartPage() {
             >
               {shipLoading ? "Saving…" : "Save address"}
             </button>
-
             {methods.length > 0 && (
               <>
                 <select
@@ -346,9 +422,11 @@ export default function CartPage() {
                   value={chosenMethodId}
                   onChange={(e) => setChosenMethodId(e.target.value)}
                 >
-                  {methods.map(m => (
+                  {methods.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name}{m.matchesCart === false ? " (not eligible)" : ""} — {m.price ? money(m.price as any) : "—"}
+                      {m.name}
+                      {m.matchesCart === false ? " (not eligible)" : ""} —{" "}
+                      {m.price ? money(m.price as any) : "—"}
                     </option>
                   ))}
                 </select>
@@ -366,19 +444,24 @@ export default function CartPage() {
           <div className="mt-2 border rounded-xl p-4 bg-white/80 space-y-2">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span>{money(totals?.subtotal || undefined)}</span>
+              <span>{money(discountedTotal)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span>{money(totals?.shipping || undefined)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Taxes</span>
-              <span>{money(totals?.tax || undefined)}</span>
-            </div>
+            {hasShippingMethod && (
+              <>
+                <div className="flex justify-between">
+                  <span>Shipping</span>
+                  <span>{money(shipping)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Taxes</span>
+                  <span>{money(tax)}</span>
+                </div>
+              </>
+            )}
+
             <div className="flex justify-between font-bold text-lg">
               <span>Order Total</span>
-              <span className="text-indigo-900">{money(totals?.total || cart.totalPrice)}</span>
+              <span className="text-indigo-900">{money(orderTotal)}</span>
             </div>
           </div>
         </div>

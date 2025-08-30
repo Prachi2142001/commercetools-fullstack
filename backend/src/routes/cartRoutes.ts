@@ -11,6 +11,7 @@ import {
   getMatchingShippingMethodsForCart,
   setShippingMethod,
   getCartTotals,
+  unsetShippingMethod,
 } from "../services/cartService";
 
 const router = Router();
@@ -19,7 +20,9 @@ type ReqWithCart = Request & { cartId?: string };
 
 router.use(async (req: ReqWithCart, res: Response, next: NextFunction) => {
   try {
-    const headerId = (req.get("x-cart-id") || (req.query.cartId as string | undefined))?.trim();
+    const headerId = (
+      req.get("x-cart-id") || (req.query.cartId as string | undefined)
+    )?.trim();
     const cookieId = (req as any).cookies?.cartId as string | undefined;
 
     if (headerId) {
@@ -54,7 +57,6 @@ router.use(async (req: ReqWithCart, res: Response, next: NextFunction) => {
   }
 });
 
-
 router.get("/cart", async (req: ReqWithCart, res: Response) => {
   const cart = await getCart(req.cartId!);
   res.json(cart);
@@ -65,7 +67,6 @@ router.post("/cart/line-items", async (req: ReqWithCart, res: Response) => {
   if (!productId || !variantId) {
     return res.status(400).send("productId and variantId are required");
   }
-
   const cart = await getCart(req.cartId!);
   const updated = await addLineItem(
     cart,
@@ -88,7 +89,11 @@ router.patch(
     const updated = await updateCart(cart, [
       { action: "changeLineItemQuantity", lineItemId, quantity },
     ]);
-    res.json(updated);
+    const finalCart =
+      (updated.totalLineItemQuantity ?? 0) === 0 && (updated as any).shippingInfo
+        ? await unsetShippingMethod(updated)
+        : updated;
+    res.json(finalCart);
   }
 );
 
@@ -101,14 +106,17 @@ router.delete(
     const updated = await updateCart(cart, [
       { action: "removeLineItem", lineItemId },
     ]);
-    res.json(updated);
+    const finalCart =
+      (updated.totalLineItemQuantity ?? 0) === 0 && (updated as any).shippingInfo
+        ? await unsetShippingMethod(updated)
+        : updated;
+    res.json(finalCart);
   }
 );
 
 router.post("/cart/discount-codes", async (req: ReqWithCart, res: Response) => {
   const { code } = req.body || {};
   if (!code) return res.status(400).send("code is required");
-
   try {
     const cart = await getCart(req.cartId!);
     const updated = await applyDiscountCode(cart, String(code));
@@ -132,34 +140,35 @@ router.post("/cart/address", async (req: ReqWithCart, res: Response) => {
   try {
     const { address } = req.body || {};
     if (!address) return res.status(400).send("address is required");
-
     const cart = await getCart(req.cartId!);
     const updated = await setShippingAddress(cart, address);
-
     res.json({
       cartId: updated.id,
       version: updated.version,
       shippingAddress: (updated as any).shippingAddress ?? null,
     });
   } catch (e: any) {
-    console.error("POST /cart/address error:", e);
     res
       .status(500)
       .json({ error: e?.message ?? "Failed to set shipping address" });
   }
 });
 
-router.get("/cart/shipping-methods", async (req: ReqWithCart, res: Response) => {
-  try {
-    const methods = await getMatchingShippingMethodsForCart(req.cartId!);
-    res.json(methods);
-  } catch (e: any) {
-    console.error("GET /cart/shipping-methods error:", e);
-    const msg = e?.message || "";
-    const code = msg.includes("Set shipping address first") ? 400 : 500;
-    res.status(code).json({ error: msg || "Failed to fetch shipping methods" });
+router.get(
+  "/cart/shipping-methods",
+  async (req: ReqWithCart, res: Response) => {
+    try {
+      const methods = await getMatchingShippingMethodsForCart(req.cartId!);
+      res.json(methods);
+    } catch (e: any) {
+      const msg = e?.message || "";
+      const code = msg.includes("Set shipping address first") ? 400 : 500;
+      res
+        .status(code)
+        .json({ error: msg || "Failed to fetch shipping methods" });
+    }
   }
-});
+);
 
 router.post(
   "/cart/set-shipping-method",
@@ -169,10 +178,10 @@ router.post(
       if (!shippingMethodId) {
         return res.status(400).send("shippingMethodId is required");
       }
-
       const methods = await getMatchingShippingMethodsForCart(req.cartId!);
-      const ok = methods.find((m) => m.id === shippingMethodId && m.matchesCart);
-
+      const ok = methods.find(
+        (m) => m.id === shippingMethodId && m.matchesCart
+      );
       if (!ok) {
         return res.status(400).json({
           error:
@@ -180,19 +189,16 @@ router.post(
           methods,
         });
       }
-
       const cart = await getCart(req.cartId!);
       const updated = await setShippingMethod(cart, String(shippingMethodId));
-
       res.json({
         cartId: updated.id,
         version: updated.version,
         shippingInfo: (updated as any).shippingInfo ?? null,
         taxedPrice: (updated as any).taxedPrice ?? null,
         totalPrice: updated.totalPrice,
-      });
+  });
     } catch (e: any) {
-      console.error("POST /cart/set-shipping-method error:", e);
       res
         .status(500)
         .json({ error: e?.message ?? "Failed to set shipping method" });
@@ -205,9 +211,29 @@ router.get("/cart/totals", async (req: ReqWithCart, res: Response) => {
     const totals = await getCartTotals(req.cartId!);
     res.json(totals);
   } catch (e: any) {
-    console.error("GET /cart/totals error:", e);
     res.status(500).json({ error: e?.message ?? "Failed to get totals" });
   }
 });
+
+router.post(
+  "/cart/unset-shipping-method",
+  async (req: ReqWithCart, res: Response) => {
+    try {
+      const cart = await getCart(req.cartId!);
+      const updated = await unsetShippingMethod(cart);
+      res.json({
+        cartId: updated.id,
+        version: updated.version,
+        shippingInfo: (updated as any).shippingInfo ?? null,
+        taxedPrice: (updated as any).taxedPrice ?? null,
+        totalPrice: updated.totalPrice,
+      });
+    } catch (e: any) {
+      res
+        .status(500)
+        .json({ error: e?.message ?? "Failed to unset shipping method" });
+    }
+  }
+);
 
 export default router;
