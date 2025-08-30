@@ -48,6 +48,7 @@ export default function CartPage() {
     {
       id: string;
       name: string;
+      key?: string;
       description?: any;
       price?: Money | null;
       matchesCart?: boolean;
@@ -62,13 +63,55 @@ export default function CartPage() {
     total?: Money | null;
   } | null>(null);
   const [shipLoading, setShipLoading] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [shippingLoading, setShippingLoading] = useState(false);
 
   async function refresh() {
     const c = await getCart();
     setCart(c);
+
     try {
       const t = await getCartTotals();
       setTotals(t);
+
+      let methods = await getShippingMethods();
+
+
+      const freeShippingIndex = methods.findIndex(
+        (x: any) =>
+          x.key === "free-shipping" ||
+          x.id === "free-shipping" ||
+          x.name?.toLowerCase().includes("free shipping")
+      );
+
+      if (freeShippingIndex > -1) {
+        methods[freeShippingIndex] = {
+          ...methods[freeShippingIndex],
+          key: "free-shipping",
+          matchesCart: c.totalPrice.centAmount >= 5000 * 100,
+        };
+      } else {
+
+        methods.push({
+          id: "free-shipping",
+          key: "free-shipping",
+          name: "Free Shipping",
+          description: { "en-US": "Free delivery for orders above $5000" },
+          price: { centAmount: 0, currencyCode: "USD", fractionDigits: 2 },
+          matchesCart: c.totalPrice.centAmount >= 5000 * 100,
+        });
+      }
+
+
+      const seen = new Set();
+      methods = methods.filter((method: any) => {
+        const key = method.key || method.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setMethods(methods);
     } catch {}
   }
 
@@ -143,17 +186,14 @@ export default function CartPage() {
 
   async function onSaveAddress() {
     try {
-      setShipLoading(true);
+      setAddressLoading(true);
       await setCartAddress(addr);
-      const m = await getShippingMethods();
-      setMethods(m);
-      if (m?.length) setChosenMethodId(m[0].id);
-      setTotals(await getCartTotals());
       setMsg({ type: "success", text: "Address saved." });
+      await refresh();
     } catch (e: any) {
       setMsg({ type: "error", text: e?.message || "Failed to save address." });
     } finally {
-      setShipLoading(false);
+      setAddressLoading(false);
     }
   }
 
@@ -197,7 +237,6 @@ export default function CartPage() {
 
   const discountCents =
     (cart as any).discountOnTotalPrice?.discountedAmount?.centAmount ?? 0;
-
 
   const discountedTotal: Money = discountCents
     ? {
@@ -296,7 +335,6 @@ export default function CartPage() {
           })}
         </div>
 
-        {/* Cart Summary: Subtotal and Total */}
         <div className="border rounded-xl p-4 sm:p-6 bg-white/80 space-y-3 shadow-sm">
           <div className="flex justify-between">
             <span>Subtotal</span>
@@ -410,37 +448,69 @@ export default function CartPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={onSaveAddress}
-              disabled={shipLoading}
+              disabled={addressLoading}
               className="bg-gray-900 text-white px-4 py-2 rounded-md shadow hover:opacity-90 disabled:opacity-60"
             >
-              {shipLoading ? "Saving…" : "Save address"}
+              {addressLoading ? "Saving…" : "Save address"}
             </button>
-            {methods.length > 0 && (
-              <>
-                <select
-                  className="border rounded px-3 py-2"
-                  value={chosenMethodId}
-                  onChange={(e) => setChosenMethodId(e.target.value)}
-                >
-                  {methods.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                      {m.matchesCart === false ? " (not eligible)" : ""} —{" "}
-                      {m.price ? money(m.price as any) : "—"}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={onChooseMethod}
-                  disabled={!chosenMethodId || shipLoading}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  {shipLoading ? "Setting…" : "Set shipping method"}
-                </button>
-              </>
-            )}
           </div>
 
+          <select
+            className="border rounded px-3 py-2 w-full"
+            value={chosenMethodId}
+            onChange={async (e) => {
+              const methodId = e.target.value;
+              setChosenMethodId(methodId);
+              if (methodId) {
+                try {
+                  setShippingLoading(true);
+                  await chooseShippingMethod(methodId);
+                  setTotals(await getCartTotals());
+                  setMsg({ type: "success", text: "Shipping method set." });
+                } catch (e: any) {
+                  setMsg({
+                    type: "error",
+                    text:
+                      e?.message ||
+                      "Failed to set shipping method. Make sure you pick one that matches the cart.",
+                  });
+                } finally {
+                  setShippingLoading(false);
+                }
+              }
+            }}
+          >
+            <option value="">-- Select a method --</option>
+            {methods.map((shippingMethods) => {
+              const desc =
+                typeof shippingMethods.description === "object"
+                  ? shippingMethods.description["en-US"] || ""
+                  : shippingMethods.description || "";
+
+              const isFreeShipping = shippingMethods.key === "free-shipping";
+              const isDisabled =
+                isFreeShipping && discountedTotal.centAmount < 5000 * 100;
+
+              return (
+                <option
+                  key={shippingMethods.id}
+                  value={shippingMethods.id}
+                  disabled={isDisabled}
+                >
+                  {shippingMethods.name}
+                  {desc ? ` – ${desc}` : ""}
+                  {isDisabled ? " (not eligible)" : ""}
+                  {" — "}
+                  {shippingMethods.price
+                    ? money(shippingMethods.price as any)
+                    : "—"}
+                </option>
+              );
+            })}
+          </select>
+          {shippingLoading && (
+            <div className="text-sm text-gray-500 mt-1">Updating shipping…</div>
+          )}
           <div className="mt-2 border rounded-xl p-4 bg-white/80 space-y-2">
             <div className="flex justify-between">
               <span>Subtotal</span>

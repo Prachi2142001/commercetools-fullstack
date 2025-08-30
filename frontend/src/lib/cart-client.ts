@@ -6,14 +6,18 @@ export type Address = {
   streetName?: string;
   postalCode?: string;
   city?: string;
-  country: string; 
+  country: string;
 };
 
 export function getCart() {
   return apiStorefront("/cart");
 }
 
-export function addLineItem(opts: { productId: string; variantId: number; quantity?: number }) {
+export function addLineItem(opts: {
+  productId: string;
+  variantId: number;
+  quantity?: number;
+}) {
   return apiStorefront("/cart/line-items", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,7 +25,10 @@ export function addLineItem(opts: { productId: string; variantId: number; quanti
   });
 }
 
-export function updateLineItemQuantity(opts: { lineItemId: string; quantity: number }) {
+export function updateLineItemQuantity(opts: {
+  lineItemId: string;
+  quantity: number;
+}) {
   return apiStorefront(`/cart/line-items/${opts.lineItemId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
