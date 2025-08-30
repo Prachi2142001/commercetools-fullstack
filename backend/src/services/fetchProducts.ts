@@ -1,4 +1,3 @@
-// src/services/fetchProduct.ts
 import type { ProductProjection } from "@commercetools/platform-sdk";
 import { ctJsonGet } from "../commercetools/client";
 
