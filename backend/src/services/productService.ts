@@ -1,4 +1,4 @@
-import { ctJsonGetOrNull, ctJsonPost } from "../commercetools/client";
+import { ctJsonGetOrNull, ctJsonPost, getAccessToken } from "../commercetools/client";
 
 export type EnumSpec = { key: string; label: string };
 
@@ -6,7 +6,7 @@ type AttrBase = {
   name: string;
   required?: boolean;
   searchable?: boolean;
-   sameForAll?: boolean;
+  sameForAll?: boolean;
 };
 
 export type AttributeSpec =
@@ -16,42 +16,33 @@ export type AttributeSpec =
   | (AttrBase & { type: "enum"; values: EnumSpec[] });
 
 export type ProductTypeConfig = {
-  key: string;       
-  attributes: AttributeSpec[]; 
+  key: string;
+  attributes: AttributeSpec[];
 };
 
 export type VariantInput = {
   sku: string;
   attributes?: Record<string, any>;
-  centAmount?: number;        
-  currencyCode?: string;     
+  centAmount?: number;
+  currencyCode?: string;
   images?: { url: string; w: number; h: number }[];
 };
 
 export type CreateProductInput = {
-
   name: string;
   currencyCode: string;
   centAmount: number;
   sku: string;
-
-
-  locale?: string;                
-  slug?: string;                  
-  description?: string;         
-
-  key?: string;                   
-  publish?: boolean;               
-
-
-  productTypeKey?: string;       
+  locale?: string;
+  slug?: string;
+  description?: string;
+  key?: string;
+  publish?: boolean;
+  productTypeKey?: string;
   productTypeConfig?: ProductTypeConfig;
-
-
-  attributes?: Record<string, any>;   
-  variants?: VariantInput[];         
+  attributes?: Record<string, any>;
+  variants?: VariantInput[];
 };
-
 
 function toSlug(input: string) {
   return input
@@ -87,19 +78,23 @@ function normalizeAttributesForDraft(
     const spec = specByName.get(name);
 
     if (!spec || spec.type !== "enum") {
-      out[name] = rawValue; 
+      out[name] = rawValue;
       continue;
     }
 
     const vals = spec.values;
-    const findByKeyCI = (v: string) => vals.find(x => x.key.toLowerCase() === v.toLowerCase());
-    const findByLabelCI = (v: string) => vals.find(x => String(x.label).toLowerCase() === v.toLowerCase());
+    const findByKeyCI = (v: string) =>
+      vals.find((x) => x.key.toLowerCase() === v.toLowerCase());
+    const findByLabelCI = (v: string) =>
+      vals.find((x) => String(x.label).toLowerCase() === v.toLowerCase());
 
     if (typeof rawValue === "string") {
       const match = findByKeyCI(rawValue) || findByLabelCI(rawValue);
       if (!match) {
-        const allowed = vals.map(v => v.key).join('", "');
-        throw new Error(`Invalid enum value for attribute "${name}": "${rawValue}". Allowed keys: "${allowed}".`);
+        const allowed = vals.map((v) => v.key).join('", "');
+        throw new Error(
+          `Invalid enum value for attribute "${name}": "${rawValue}". Allowed keys: "${allowed}".`
+        );
       }
       out[name] = { key: match.key, label: match.label };
       continue;
@@ -108,8 +103,10 @@ function normalizeAttributesForDraft(
     if (rawValue && typeof rawValue === "object" && "key" in rawValue) {
       const match = findByKeyCI(String(rawValue.key));
       if (!match) {
-        const allowed = vals.map(v => v.key).join('", "');
-        throw new Error(`Invalid enum object for attribute "${name}": key="${rawValue.key}". Allowed keys: "${allowed}".`);
+        const allowed = vals.map((v) => v.key).join('", "');
+        throw new Error(
+          `Invalid enum object for attribute "${name}": key="${rawValue.key}". Allowed keys: "${allowed}".`
+        );
       }
       out[name] = { key: match.key, label: match.label };
       continue;
@@ -121,7 +118,6 @@ function normalizeAttributesForDraft(
   return out;
 }
 
-
 function attrDefFromSpec(a: AttributeSpec) {
   const attributeConstraint = a.sameForAll ? "SameForAll" : "None";
 
@@ -129,17 +125,21 @@ function attrDefFromSpec(a: AttributeSpec) {
     name: a.name,
     label: { en: a.name[0]?.toUpperCase() + a.name.slice(1) },
     isRequired: !!a.required,
-    isSearchable: a.searchable !== false, 
-    attributeConstraint,               
+    isSearchable: a.searchable !== false,
+    attributeConstraint,
     inputHint: "SingleLine" as const,
   };
 
   switch (a.type) {
-    case "enum":    return { ...base, type: { name: "enum", values: a.values } };
-    case "number":  return { ...base, type: { name: "number" } };
-    case "boolean": return { ...base, type: { name: "boolean" } };
+    case "enum":
+      return { ...base, type: { name: "enum", values: a.values } };
+    case "number":
+      return { ...base, type: { name: "number" } };
+    case "boolean":
+      return { ...base, type: { name: "boolean" } };
     case "text":
-    default:        return { ...base, type: { name: "text" } };
+    default:
+      return { ...base, type: { name: "text" } };
   }
 }
 
@@ -147,7 +147,9 @@ export async function ensureProductTypeWithAttributes(
   key: string,
   attrs: AttributeSpec[]
 ) {
-  const existing = await ctJsonGetOrNull(`/product-types/key=${encodeURIComponent(key)}`);
+  const existing = await ctJsonGetOrNull(
+    `/product-types/key=${encodeURIComponent(key)}`
+  );
 
   if (!existing) {
     return await ctJsonPost(`/product-types`, {
@@ -173,10 +175,12 @@ export async function ensureProductTypeWithAttributes(
     const already = present[spec.name];
 
     if (!already) {
-      actions.push({ action: "addAttributeDefinition", attribute: attrDefFromSpec(spec) });
+      actions.push({
+        action: "addAttributeDefinition",
+        attribute: attrDefFromSpec(spec),
+      });
       continue;
     }
-
 
     if (spec.type === "enum" && already.type?.name === "enum") {
       const have = new Set((already.type.values ?? []).map((v: any) => v.key));
@@ -219,24 +223,29 @@ export async function createProduct(input: CreateProductInput) {
     variants = [],
   } = input;
 
- 
   const typeKey = productTypeConfig?.key ?? productTypeKey;
   const typeAttrs: AttributeSpec[] =
-    productTypeConfig?.attributes ??
-    [
-      { name: "color", type: "enum", values: [{ key: "black", label: "Black" }] },
-      { name: "size",  type: "enum", values: [{ key: "m",     label: "M"     }] },
+    productTypeConfig?.attributes ?? [
+      {
+        name: "color",
+        type: "enum",
+        values: [{ key: "black", label: "Black" }],
+      },
+      { name: "size", type: "enum", values: [{ key: "m", label: "M" }] },
     ];
 
-  const productType = await ensureProductTypeWithAttributes(typeKey, typeAttrs);
+  const productType = await ensureProductTypeWithAttributes(
+    typeKey,
+    typeAttrs
+  );
 
   const normalizedMasterAttrs =
     normalizeAttributesForDraft(attributes, productTypeConfig) ?? {};
 
   const sameForAllSet = new Set(
     (productTypeConfig?.attributes ?? [])
-      .filter(a => a.sameForAll)
-      .map(a => a.name)
+      .filter((a) => a.sameForAll)
+      .map((a) => a.name)
   );
   for (const name of sameForAllSet) {
     if (normalizedMasterAttrs[name] === undefined) {
@@ -246,22 +255,21 @@ export async function createProduct(input: CreateProductInput) {
     }
   }
 
-
-  const normalizedVariants = variants.map(v => {
-    const vAttrs = normalizeAttributesForDraft(v.attributes, productTypeConfig) ?? {};
+  const normalizedVariants = variants.map((v) => {
+    const vAttrs =
+      normalizeAttributesForDraft(v.attributes, productTypeConfig) ?? {};
 
     for (const name of sameForAllSet) {
       const masterVal = normalizedMasterAttrs[name];
       if (vAttrs[name] === undefined) {
         vAttrs[name] = masterVal;
       } else {
-   
         const a = JSON.stringify(vAttrs[name]);
         const b = JSON.stringify(masterVal);
         if (a !== b) {
           throw new Error(
             `Attribute "${name}" is SameForAll and must match the master for all variants. ` +
-            `Variant "${v.sku}" differs.`
+              `Variant "${v.sku}" differs.`
           );
         }
       }
@@ -269,7 +277,6 @@ export async function createProduct(input: CreateProductInput) {
 
     return { ...v, attributes: vAttrs };
   });
-
 
   const draft: any = {
     key,
@@ -281,18 +288,19 @@ export async function createProduct(input: CreateProductInput) {
       attributes: attrObjToArray(normalizedMasterAttrs),
       prices: [{ value: { currencyCode, centAmount } }],
     },
-    variants: normalizedVariants.map(v => ({
+    variants: normalizedVariants.map((v) => ({
       sku: v.sku,
       attributes: attrObjToArray(v.attributes),
       prices: [
         {
           value: {
             currencyCode: v.currencyCode || currencyCode,
-            centAmount: typeof v.centAmount === "number" ? v.centAmount : centAmount,
+            centAmount:
+              typeof v.centAmount === "number" ? v.centAmount : centAmount,
           },
         },
       ],
-      images: (v.images ?? []).map(img => ({
+      images: (v.images ?? []).map((img) => ({
         url: img.url,
         dimensions: { w: img.w, h: img.h },
       })),
@@ -304,8 +312,7 @@ export async function createProduct(input: CreateProductInput) {
     draft.description = localized(description, locale);
   }
 
-  const created = await ctJsonPost(`/products`, draft);
-  return created;
+  return await ctJsonPost(`/products`, draft);
 }
 
 export async function publishProduct(productId: string, version: number) {
@@ -320,4 +327,32 @@ export async function unpublishProduct(productId: string, version: number) {
     version,
     actions: [{ action: "unpublish" }],
   });
+}
+
+export async function updateProduct(
+  id: string,
+  version: number,
+  actions: any[]
+) {
+  return await ctJsonPost(`/products/${id}`, { version, actions });
+}
+
+export async function deleteProduct(id: string, version: number) {
+  const token = await getAccessToken(); 
+  const res = await fetch(
+    `${process.env.CT_API_URL}/${process.env.CT_PROJECT_KEY}/products/${id}?version=${version}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(
+      `DELETE /products/${id} failed (${res.status}): ${text}`
+    );
+  }
+
+  return res.json();
 }

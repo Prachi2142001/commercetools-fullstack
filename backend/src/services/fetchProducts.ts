@@ -1,13 +1,10 @@
 // src/services/fetchProduct.ts
-// Service that reads Product Projections for storefront (listing & detail)
-
-import type { ProductProjection } from "@commercetools/platform-sdk"; // optional but useful for types
+import type { ProductProjection } from "@commercetools/platform-sdk";
 import { ctJsonGet } from "../commercetools/client";
 
-/** ---------- Types returned to your frontend ---------- */
 export type MoneyView = {
   currencyCode: string;
-  amount: number; // decimal value for UI
+  amount: number;
   centAmount: number;
   fractionDigits: number;
 };
@@ -19,11 +16,7 @@ export type PriceView = {
 
 export type ProductListItem = {
   id: string;
-  slug: string;
   name: string;
-  thumbnail?: string;
-  variantId: number;
-  sku?: string;
   price: PriceView;
 };
 
@@ -43,17 +36,22 @@ export type ProductDetail = {
   variants: VariantView[];
 };
 
-/** ---------- Helpers ---------- */
-function pickLocale<T extends Record<string, string>>(loc: T | undefined, locale: string): string | undefined {
+function pickLocale<T extends Record<string, string>>(
+  loc: T | undefined,
+  locale: string
+): string | undefined {
   if (!loc) return undefined;
   if (loc[locale]) return loc[locale];
-  // simple fallback: first value
   const vals = Object.values(loc);
   return vals.length ? vals[0] : undefined;
 }
 
 function moneyToView(
-  value?: { currencyCode: string; centAmount: number; fractionDigits: number } | null
+  value?: {
+    currencyCode: string;
+    centAmount: number;
+    fractionDigits: number;
+  } | null
 ): MoneyView | null {
   if (!value) return null;
   const { currencyCode, centAmount, fractionDigits } = value;
@@ -88,16 +86,10 @@ function mapVariant(v: any): VariantView {
 
 function mapListItem(p: ProductProjection, locale: string): ProductListItem {
   const name = pickLocale(p.name as any, locale) || "Untitled";
-  const slug = pickLocale(p.slug as any, locale) || p.id;
   const mv: any = p.masterVariant;
-  const thumb = mv?.images?.[0]?.url;
   return {
     id: p.id,
-    slug,
     name,
-    thumbnail: thumb,
-    variantId: mv?.id,
-    sku: mv?.sku,
     price: priceFromVariant(mv),
   };
 }
@@ -114,21 +106,21 @@ function mapDetail(p: ProductProjection, locale: string): ProductDetail {
 }
 
 function escQuotes(s: string) {
-  // Escape any " in slug value
   return s.replace(/"/g, '\\"');
 }
 
-/** ---------- Public API ---------- */
-export async function listProducts(opts: {
-  limit?: number;
-  offset?: number;
-  locale?: string;
-  currency?: string;
-  country?: string;
-  customerGroupId?: string;
-  channelId?: string;
-  staged?: boolean;
-} = {}) {
+export async function listProducts(
+  opts: {
+    limit?: number;
+    offset?: number;
+    locale?: string;
+    currency?: string;
+    country?: string;
+    customerGroupId?: string;
+    channelId?: string;
+    staged?: boolean;
+  } = {}
+) {
   const {
     limit = 20,
     offset = 0,
@@ -141,7 +133,6 @@ export async function listProducts(opts: {
   } = opts;
 
   const query: Record<string, any> = { limit, offset, staged };
-  // Price selection => scopedPrice on variants
   if (currency) query.priceCurrency = currency;
   if (country) query.priceCountry = country;
   if (customerGroupId) query.priceCustomerGroup = customerGroupId;
@@ -173,7 +164,14 @@ export async function getProductByIdOrSlug(
     staged?: boolean;
   } = {}
 ) {
-  const { locale = "en-IN", currency = "INR", country, customerGroupId, channelId, staged = false } = opts;
+  const {
+    locale = "en-IN",
+    currency = "INR",
+    country,
+    customerGroupId,
+    channelId,
+    staged = false,
+  } = opts;
 
   const common: Record<string, any> = { staged };
   if (currency) common.priceCurrency = currency;
@@ -181,22 +179,20 @@ export async function getProductByIdOrSlug(
   if (customerGroupId) common.priceCustomerGroup = customerGroupId;
   if (channelId) common.priceChannel = channelId;
 
-  // 1) Try by ID first
   try {
-    const byId = await ctJsonGet<ProductProjection>(`/product-projections/${idOrSlug}`, common);
+    const byId = await ctJsonGet<ProductProjection>(
+      `/product-projections/${idOrSlug}`,
+      common
+    );
     return mapDetail(byId, locale);
-  } catch {
-    // ignore and try slug
-  }
+  } catch {}
 
-  // 2) Try by slug (✅ Correct where syntax: slug(<locale>="<slug>"))
-  // Locale (en or en-IN) must NOT be quoted; value must be quoted.
   const where = `slug(${locale}="${escQuotes(idOrSlug)}")`;
 
-  const bySlug = await ctJsonGet<{ count: number; results: ProductProjection[] }>(
-    "/product-projections",
-    { ...common, where, limit: 1 }
-  );
+  const bySlug = await ctJsonGet<{
+    count: number;
+    results: ProductProjection[];
+  }>("/product-projections", { ...common, where, limit: 1 });
 
   if (!bySlug.count) {
     const e: any = new Error("Product not found");

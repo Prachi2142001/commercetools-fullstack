@@ -41,7 +41,7 @@ function buildUrl(path: string, query?: Record<string, any>): string {
   return url.toString();
 }
 
-async function getAccessToken(): Promise<string> {
+export async function getAccessToken(): Promise<string> {
   const now = Date.now();
   if (cachedToken && cachedToken.expires_at > now + 5000) {
     return cachedToken.access_token;

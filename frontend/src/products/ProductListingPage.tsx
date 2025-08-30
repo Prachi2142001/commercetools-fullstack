@@ -60,7 +60,7 @@ function ProductCardActions({ productId, variantId }: { productId: string; varia
 
   return (
     <div
-      className="mt-2 flex items-center gap-2 px-2 relative z-50 pointer-events-auto"
+      className="mt-2 flex items-center gap-2 px-2 relative z-50 pointer-events-auto justify-center"
       onMouseDown={stop}
       onClick={stop}
     >
