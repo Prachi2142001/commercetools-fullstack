@@ -37,31 +37,23 @@ export async function fetchProductList(
   limit = 20,
   offset = 0
 ): Promise<{ results: ProductListItem[] }> {
-  const url = new URL(`${STORE_FRONT}/products`);
-  url.searchParams.set("limit", String(limit));
-  url.searchParams.set("offset", String(offset));
-  url.searchParams.set("locale", LOCALE);
-  url.searchParams.set("currency", CURRENCY);
+  const query = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+    locale: LOCALE,
+    currency: CURRENCY,
+  });
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`PLP fetch failed: ${res.status} ${text}`);
-  }
-  return res.json();
+  return apiStorefront(`/products?${query.toString()}`);
 }
 
 export async function fetchProductDetail(idOrSlug: string): Promise<ProductDetail> {
-  const url = new URL(`${STORE_FRONT}/products/${encodeURIComponent(idOrSlug)}`);
-  url.searchParams.set("locale", LOCALE);
-  url.searchParams.set("currency", CURRENCY);
+  const query = new URLSearchParams({
+    locale: LOCALE,
+    currency: CURRENCY,
+  });
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`PDP fetch failed: ${res.status} ${text}`);
-  }
-  return res.json();
+  return apiStorefront(`/products/${encodeURIComponent(idOrSlug)}?${query.toString()}`);
 }
 
 export function getStoredCartId() {
